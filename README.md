@@ -11,9 +11,10 @@ emulator is more than questionable, probably because of my lack of knowledge whe
 
 # Building
 
-To build it you will need SDL2 installed on your system and available through `pkg-config`
+To build it you will need SDL2 installed on your system and available through `pkg-config` and `meson` to configure and generate build files.
 
-Simply run `make` to build the binary, don't forget to clone the submodules :')
+To configure the project, run `meson build` where build is the build directory name, then if there were no errors you can change to the build
+directory and run `ninja` to build the binary. Don't forget to clone the submodules :')
 
 # Screenshots
 
