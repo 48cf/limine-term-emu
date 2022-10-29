@@ -1,9 +1,17 @@
 #include <fcntl.h>
 #include <poll.h>
-#include <pty.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+#if defined(__linux__)
+#  include <pty.h>
+#elif defined(__APPLE__)
+#  include <util.h>
+#else
+#  error "Unsupported platform"
+#endif
 
 #include <SDL2/SDL.h>
 #include <backends/framebuffer.h>
@@ -22,9 +30,11 @@ static void free_with_size(void *ptr, size_t size) {
     free(ptr);
 }
 
+static int is_running = 1;
+static struct term_context *ctx;
 static int pty_master, pty_slave;
 
-static void handle_key(struct term_context *ctx, SDL_KeyboardEvent *ev) {
+static void handle_key(SDL_KeyboardEvent *ev) {
     (void)ctx;
     (void)ev;
 
@@ -118,6 +128,20 @@ static void handle_key(struct term_context *ctx, SDL_KeyboardEvent *ev) {
     }
 }
 
+static void *read_from_pty(void *arg) {
+    (void)arg;
+
+    int read_bytes;
+    char buffer[512];
+
+    while (is_running != 0 && (read_bytes = read(pty_master, buffer, 512)) > 0) {
+        term_write(ctx, buffer, read_bytes);
+    }
+
+    is_running = 0;
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -137,14 +161,19 @@ int main(int argc, char **argv) {
     int pid = fork();
 
     if (pid == 0) {
+        close(pty_master);
+        setsid();
+        ioctl(pty_slave, TIOCSCTTY, 0);
+
         dup2(pty_slave, 0);
         dup2(pty_slave, 1);
         dup2(pty_slave, 2);
-        execlp("bash", "bash", "-l", NULL);
+        close(pty_slave);
+
+        execlp("/bin/bash", "/bin/bash", "-l", NULL);
     }
 
-    fcntl(pty_master, F_SETFL, fcntl(pty_master, F_GETFL, 0) | O_NONBLOCK);
-    fcntl(pty_slave, F_SETFL, fcntl(pty_slave, F_GETFL, 0) | O_NONBLOCK);
+    close(pty_slave);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
         printf("SDL could not be initialized: %s\n", SDL_GetError());
@@ -158,9 +187,9 @@ int main(int argc, char **argv) {
 
     SDL_Window *window = SDL_CreateWindow(
         "Limine Terminal",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH, WINDOW_HEIGHT,
-        SDL_WINDOW_SHOWN
+        SDL_WINDOW_HIDDEN
     );
 
     if (!window) {
@@ -195,41 +224,32 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    struct term_context *ctx = fbterm_init(
+    ctx = fbterm_init(
         malloc,
         framebuffer, WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_WIDTH * 4,
         NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 1, 1, 0
     );
 
-    for (int running = 1; running;) {
+    pthread_t pty_thread;
+
+    if (pthread_create(&pty_thread, NULL, read_from_pty, NULL) != 0) {
+        printf("Could not create PTY reader thread\n");
+        return 1;
+    }
+
+    SDL_ShowWindow(window);
+
+    for (; is_running != 0;) {
         SDL_Event ev;
 
         if (SDL_PollEvent(&ev)) {
             switch (ev.type) {
                 case SDL_QUIT:
-                    running = 0;
+                    is_running = 0;
                     break;
                 case SDL_KEYDOWN:
-                    handle_key(ctx, &ev.key);
+                    handle_key(&ev.key);
                     break;
-            }
-        }
-
-        struct pollfd fds[2] = {
-            { .fd = pty_master, .events = POLLIN, .revents = 0 },
-            { .fd = pty_slave, .events = POLLOUT, .revents = 0 },
-        };
-
-        poll(fds, 2, 0);
-
-        char buffer[512];
-
-        if (fds[1].revents & POLLOUT) {
-            int read_bytes;
-
-            while ((read_bytes = read(pty_master, buffer, 512)) > 0) {
-                printf("Writing %d bytes to terminal\n", read_bytes);
-                term_write(ctx, buffer, read_bytes);
             }
         }
 
@@ -241,7 +261,7 @@ int main(int argc, char **argv) {
 
     close(pty_slave);
     close(pty_master);
-    
+
     kill(pid, SIGTERM);
     kill(pid, SIGKILL);
 
