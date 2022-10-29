@@ -15,7 +15,7 @@
 #endif
 
 #include <SDL2/SDL.h>
-#include <backends/framebuffer.h>
+#include "terminal/backends/framebuffer.h"
 
 #define FONT_WIDTH 8
 #define FONT_HEIGHT 16

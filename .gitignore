@@ -1,3 +1,4 @@
 *.d
 *.o
-limine-term
+.cache
+build
