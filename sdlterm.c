@@ -163,6 +163,7 @@ static void handle_key(SDL_KeyboardEvent *ev) {
         case SDLK_END: write(pty_master, "\x1b[4~", 4); break;
         case SDLK_PAGEUP: write(pty_master, "\x1b[5~", 4); break;
         case SDLK_PAGEDOWN: write(pty_master, "\x1b[6~", 4); break;
+        case SDLK_INSERT: write(pty_master, "\x1b[2~", 4); break;
         case SDLK_DELETE: write(pty_master, "\x1b[3~", 4); break;
         case SDLK_SPACE: write(pty_master, " ", 1); break;
     }
