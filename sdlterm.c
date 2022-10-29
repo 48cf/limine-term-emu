@@ -2,6 +2,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -25,19 +26,58 @@
 #define WINDOW_WIDTH (DEFAULT_COLS * (FONT_WIDTH + 1))
 #define WINDOW_HEIGHT (DEFAULT_ROWS * FONT_HEIGHT)
 
+static bool is_running = true;
+static struct term_context *ctx;
+static int pty_master, pty_slave;
+
 static void free_with_size(void *ptr, size_t size) {
     (void)size;
     free(ptr);
 }
 
-static int is_running = 1;
-static struct term_context *ctx;
-static int pty_master, pty_slave;
+static void terminal_callback(struct term_context *ctx, uint64_t type, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+    (void)ctx;
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
+
+    switch (type) {
+        case TERM_CB_DEC:
+            printf("TERM_CB_DEC");
+            goto values;
+        case TERM_CB_MODE:
+            printf("TERM_CB_MODE");
+            goto values;
+        case TERM_CB_LINUX:
+            printf("TERM_CB_LINUX");
+            values:
+                printf("(count=%lu, values={", arg1);
+                for (uint64_t i = 0; i < arg1; i++) {
+                    printf(i == 0 ? "%u" : ", %u", ((uint32_t*)arg2)[i]);
+                }
+                printf("}, final='%c')\n", (int)arg3);
+                break;
+        case TERM_CB_BELL: printf("TERM_CB_BELL()\n"); break;
+        case TERM_CB_PRIVATE_ID: printf("TERM_CB_PRIVATE_ID()\n"); break;
+        case TERM_CB_STATUS_REPORT: printf("TERM_CB_STATUS_REPORT()\n"); break;
+        case TERM_CB_POS_REPORT: printf("TERM_CB_POS_REPORT(x=%lu, y=%lu)\n", arg1, arg2); break;
+        case TERM_CB_KBD_LEDS:
+            printf("TERM_CB_KBD_LEDS(state=");
+            switch (arg1) {
+                case 0: printf("CLEAR_ALL"); break;
+                case 1: printf("SET_SCRLK"); break;
+                case 2: printf("SET_NUMLK"); break;
+                case 3: printf("SET_CAPSLK"); break;
+            }
+            printf(")\n");
+            break;
+        default:
+            printf("Unknown callback type %lu: %lx, %lx, %lx\n", type, arg1, arg2, arg3);
+            break;
+    }
+}
 
 static void handle_key(SDL_KeyboardEvent *ev) {
-    (void)ctx;
-    (void)ev;
-
 #define MODS(key, regular, shift, caps, shift_caps) \
     case key: { \
         char ctrl_value = shift[0] - 0x40; \
@@ -134,11 +174,11 @@ static void *read_from_pty(void *arg) {
     int read_bytes;
     char buffer[512];
 
-    while (is_running != 0 && (read_bytes = read(pty_master, buffer, 512)) > 0) {
+    while (is_running && (read_bytes = read(pty_master, buffer, 512)) > 0) {
         term_write(ctx, buffer, read_bytes);
     }
 
-    is_running = 0;
+    is_running = false;
     return NULL;
 }
 
@@ -175,7 +215,7 @@ int main(int argc, char **argv) {
 
     close(pty_slave);
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("SDL could not be initialized: %s\n", SDL_GetError());
         return 1;
     }
@@ -230,6 +270,13 @@ int main(int argc, char **argv) {
         NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 1, 1, 0
     );
 
+    if (!ctx) {
+        printf("Could not create terminal context\n");
+        return 1;
+    }
+
+    ctx->callback = terminal_callback;
+
     pthread_t pty_thread;
 
     if (pthread_create(&pty_thread, NULL, read_from_pty, NULL) != 0) {
@@ -239,13 +286,13 @@ int main(int argc, char **argv) {
 
     SDL_ShowWindow(window);
 
-    for (; is_running != 0;) {
+    for (; is_running;) {
         SDL_Event ev;
 
         if (SDL_PollEvent(&ev)) {
             switch (ev.type) {
                 case SDL_QUIT:
-                    is_running = 0;
+                    is_running = false;
                     break;
                 case SDL_KEYDOWN:
                     handle_key(&ev.key);
