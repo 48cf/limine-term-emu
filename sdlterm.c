@@ -1,18 +1,13 @@
+#define _XOPEN_SOURCE 600
+
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
-
-#if defined(__linux__)
-#  include <pty.h>
-#elif defined(__APPLE__)
-#  include <util.h>
-#else
-#  error "Unsupported platform"
-#endif
 
 #include <SDL2/SDL.h>
 #include "terminal/backends/framebuffer.h"
@@ -28,7 +23,7 @@
 
 static bool is_running = true;
 static struct term_context *ctx;
-static int pty_master, pty_slave;
+static int pty_master;
 
 static void free_with_size(void *ptr, size_t size) {
     (void)size;
@@ -187,24 +182,31 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    struct winsize win_size = {
-        .ws_col = DEFAULT_COLS,
-        .ws_row = DEFAULT_ROWS,
-        .ws_xpixel = WINDOW_WIDTH,
-        .ws_ypixel = WINDOW_HEIGHT,
-    };
+    // struct winsize win_size = {
+    //     .ws_col = DEFAULT_COLS,
+    //     .ws_row = DEFAULT_ROWS,
+    //     .ws_xpixel = WINDOW_WIDTH,
+    //     .ws_ypixel = WINDOW_HEIGHT,
+    // };
 
-    if (openpty(&pty_master, &pty_slave, NULL, NULL, &win_size) < 0) {
-        printf("Could not create a PTY\n");
+    pty_master = posix_openpt(O_RDWR);
+
+    if (pty_master < 0) {
+        printf("Could not open a PTY\n");
         return 1;
     }
+
+    unlockpt(pty_master);
+    grantpt(pty_master);
 
     int pid = fork();
 
     if (pid == 0) {
+        int pty_slave = open(ptsname(pty_master), O_RDWR | O_NOCTTY);
+
         close(pty_master);
-        setsid();
         ioctl(pty_slave, TIOCSCTTY, 0);
+        setsid();
 
         dup2(pty_slave, 0);
         dup2(pty_slave, 1);
@@ -213,8 +215,6 @@ int main(int argc, char **argv) {
 
         execlp("/bin/bash", "/bin/bash", "-l", NULL);
     }
-
-    close(pty_slave);
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("SDL could not be initialized: %s\n", SDL_GetError());
@@ -307,7 +307,6 @@ int main(int argc, char **argv) {
         SDL_RenderPresent(renderer);
     }
 
-    close(pty_slave);
     close(pty_master);
 
     kill(pid, SIGTERM);
