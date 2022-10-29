@@ -102,7 +102,7 @@ static void handle_key(SDL_KeyboardEvent *ev) {
         MODS(SDLK_l, "l", "L", "L", "l")
         MODS(SDLK_SEMICOLON, ";", ":", ";", ":")
         MODS(SDLK_QUOTE, "'", "\"", "'", "\"")
-        NOMODS(SDLK_RETURN, "\n")
+        NOMODS(SDLK_RETURN, "\r")
 
         MODS(SDLK_z, "z", "Z", "Z", "z")
         MODS(SDLK_x, "x", "X", "X", "x")
