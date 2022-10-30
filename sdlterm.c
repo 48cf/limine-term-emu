@@ -1,3 +1,5 @@
+#include <SDL2/SDL.h>
+
 #define _XOPEN_SOURCE 600
 
 #include <fcntl.h>
@@ -7,9 +9,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 #include <unistd.h>
 
-#include <SDL2/SDL.h>
 #include "terminal/backends/framebuffer.h"
 
 #define FONT_WIDTH 8
@@ -182,12 +184,12 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    // struct winsize win_size = {
-    //     .ws_col = DEFAULT_COLS,
-    //     .ws_row = DEFAULT_ROWS,
-    //     .ws_xpixel = WINDOW_WIDTH,
-    //     .ws_ypixel = WINDOW_HEIGHT,
-    // };
+    struct winsize win_size = {
+        .ws_col = DEFAULT_COLS,
+        .ws_row = DEFAULT_ROWS,
+        .ws_xpixel = WINDOW_WIDTH,
+        .ws_ypixel = WINDOW_HEIGHT,
+    };
 
     pty_master = posix_openpt(O_RDWR);
 
@@ -206,6 +208,7 @@ int main(int argc, char **argv) {
 
         close(pty_master);
         ioctl(pty_slave, TIOCSCTTY, 0);
+        ioctl(pty_slave, TIOCSWINSZ, &win_size);
         setsid();
 
         dup2(pty_slave, 0);
