@@ -7,4 +7,4 @@ c_files = files(
     'sdlterm.c',
 )
 
-executable('limine-term', c_files, dependencies: [sdl2])
+executable('limine-term', c_files, dependencies: [sdl2], install: true)
