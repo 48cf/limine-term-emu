@@ -15,6 +15,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "terminal/backends/framebuffer.h"
 
@@ -176,7 +177,19 @@ static void *read_from_pty(void *arg) {
     int read_bytes;
     char buffer[512];
 
-    while (is_running && (read_bytes = read(pty_master, buffer, 512)) > 0) {
+    while (is_running) {
+        read_bytes = read(pty_master, buffer, sizeof(buffer));
+        if (read_bytes < 0) {
+            if (errno == EINTR || errno == EAGAIN) {
+                // retry
+                continue;
+            }
+
+            // abort           
+            printf("read_from_pty: read() failed (errno=%d)", errno);
+            break;
+        }
+
         term_write(ctx, buffer, read_bytes);
     }
 
