@@ -94,7 +94,7 @@ static void terminal_callback(struct term_context *ctx, uint64_t type, uint64_t 
 }
 
 static void handle_key(SDL_KeyboardEvent *ev) {
-#define MODS(key, regular, shift, caps, shift_caps) \
+#define MOD_SHIFT(key, regular, shift, caps, shift_caps) \
     case key: { \
         char ctrl_value = shift[0] - 0x40; \
         const char *buf = regular; size_t len = sizeof(regular) - 1; \
@@ -111,77 +111,130 @@ static void handle_key(SDL_KeyboardEvent *ev) {
         break; \
     }
 
-#define NOMODS(key, output) \
+#define MOD_CTRL_ALT(key, regular, ctrl, alt) \
+    case key: { \
+        const char *buf = regular; size_t len = sizeof(regular) - 1; \
+        if (ev->keysym.mod & KMOD_CTRL) { \
+            buf = ctrl; len = sizeof(ctrl) - 1; \
+        } else if (ev->keysym.mod & KMOD_ALT) { \
+            buf = alt; len = sizeof(alt) - 1; \
+        } \
+        write(pty_master, buf, len); \
+        break; \
+    }
+
+#define NO_MODS(key, output) \
     case key: \
         write(pty_master, output, sizeof(output) - 1); \
         break;
 
     switch (ev->keysym.sym) {
-        MODS(SDLK_BACKQUOTE, "`", "~", "`", "~")
-        MODS(SDLK_1, "1", "!", "1", "!")
-        MODS(SDLK_2, "2", "@", "2", "@")
-        MODS(SDLK_3, "3", "#", "3", "#")
-        MODS(SDLK_4, "4", "$", "4", "$")
-        MODS(SDLK_5, "5", "%", "5", "%")
-        MODS(SDLK_6, "6", "^", "6", "^")
-        MODS(SDLK_7, "7", "&", "7", "&")
-        MODS(SDLK_8, "8", "*", "8", "*")
-        MODS(SDLK_9, "9", "(", "9", "(")
-        MODS(SDLK_0, "0", ")", "0", ")")
-        MODS(SDLK_MINUS, "-", "_", "-", "_")
-        MODS(SDLK_EQUALS, "=", "+", "=", "+")
-        NOMODS(SDLK_BACKSPACE, "\b")
+        MOD_SHIFT(SDLK_BACKQUOTE, "`", "~", "`", "~")
+        MOD_SHIFT(SDLK_1, "1", "!", "1", "!")
+        MOD_SHIFT(SDLK_2, "2", "@", "2", "@")
+        MOD_SHIFT(SDLK_3, "3", "#", "3", "#")
+        MOD_SHIFT(SDLK_4, "4", "$", "4", "$")
+        MOD_SHIFT(SDLK_5, "5", "%", "5", "%")
+        MOD_SHIFT(SDLK_6, "6", "^", "6", "^")
+        MOD_SHIFT(SDLK_7, "7", "&", "7", "&")
+        MOD_SHIFT(SDLK_8, "8", "*", "8", "*")
+        MOD_SHIFT(SDLK_9, "9", "(", "9", "(")
+        MOD_SHIFT(SDLK_0, "0", ")", "0", ")")
+        MOD_SHIFT(SDLK_MINUS, "-", "_", "-", "_")
+        MOD_SHIFT(SDLK_EQUALS, "=", "+", "=", "+")
+        NO_MODS(SDLK_BACKSPACE, "\b")
 
-        NOMODS(SDLK_TAB, "\t")
-        MODS(SDLK_q, "q", "Q", "Q", "q")
-        MODS(SDLK_w, "w", "W", "W", "w")
-        MODS(SDLK_e, "e", "E", "E", "e")
-        MODS(SDLK_r, "r", "R", "R", "r")
-        MODS(SDLK_t, "t", "T", "T", "t")
-        MODS(SDLK_y, "y", "Y", "Y", "y")
-        MODS(SDLK_u, "u", "U", "U", "u")
-        MODS(SDLK_i, "i", "I", "I", "i")
-        MODS(SDLK_o, "o", "O", "O", "o")
-        MODS(SDLK_p, "p", "P", "P", "p")
-        MODS(SDLK_LEFTBRACKET, "[", "{", "[", "{")
-        MODS(SDLK_RIGHTBRACKET, "]", "}", "]", "}")
-        MODS(SDLK_BACKSLASH, "\\", "|", "\\", "|")
+        NO_MODS(SDLK_TAB, "\t")
+        MOD_SHIFT(SDLK_q, "q", "Q", "Q", "q")
+        MOD_SHIFT(SDLK_w, "w", "W", "W", "w")
+        MOD_SHIFT(SDLK_e, "e", "E", "E", "e")
+        MOD_SHIFT(SDLK_r, "r", "R", "R", "r")
+        MOD_SHIFT(SDLK_t, "t", "T", "T", "t")
+        MOD_SHIFT(SDLK_y, "y", "Y", "Y", "y")
+        MOD_SHIFT(SDLK_u, "u", "U", "U", "u")
+        MOD_SHIFT(SDLK_i, "i", "I", "I", "i")
+        MOD_SHIFT(SDLK_o, "o", "O", "O", "o")
+        MOD_SHIFT(SDLK_p, "p", "P", "P", "p")
+        MOD_SHIFT(SDLK_LEFTBRACKET, "[", "{", "[", "{")
+        MOD_SHIFT(SDLK_RIGHTBRACKET, "]", "}", "]", "}")
+        MOD_SHIFT(SDLK_BACKSLASH, "\\", "|", "\\", "|")
 
-        MODS(SDLK_a, "a", "A", "A", "a")
-        MODS(SDLK_s, "s", "S", "S", "s")
-        MODS(SDLK_d, "d", "D", "D", "d")
-        MODS(SDLK_f, "f", "F", "F", "f")
-        MODS(SDLK_g, "g", "G", "G", "g")
-        MODS(SDLK_h, "h", "H", "H", "h")
-        MODS(SDLK_j, "j", "J", "J", "j")
-        MODS(SDLK_k, "k", "K", "K", "k")
-        MODS(SDLK_l, "l", "L", "L", "l")
-        MODS(SDLK_SEMICOLON, ";", ":", ";", ":")
-        MODS(SDLK_QUOTE, "'", "\"", "'", "\"")
-        NOMODS(SDLK_RETURN, "\r")
+        MOD_SHIFT(SDLK_a, "a", "A", "A", "a")
+        MOD_SHIFT(SDLK_s, "s", "S", "S", "s")
+        MOD_SHIFT(SDLK_d, "d", "D", "D", "d")
+        MOD_SHIFT(SDLK_f, "f", "F", "F", "f")
+        MOD_SHIFT(SDLK_g, "g", "G", "G", "g")
+        MOD_SHIFT(SDLK_h, "h", "H", "H", "h")
+        MOD_SHIFT(SDLK_j, "j", "J", "J", "j")
+        MOD_SHIFT(SDLK_k, "k", "K", "K", "k")
+        MOD_SHIFT(SDLK_l, "l", "L", "L", "l")
+        MOD_SHIFT(SDLK_SEMICOLON, ";", ":", ";", ":")
+        MOD_SHIFT(SDLK_QUOTE, "'", "\"", "'", "\"")
+        NO_MODS(SDLK_RETURN, "\r")
 
-        MODS(SDLK_z, "z", "Z", "Z", "z")
-        MODS(SDLK_x, "x", "X", "X", "x")
-        MODS(SDLK_c, "c", "C", "C", "c")
-        MODS(SDLK_v, "v", "V", "V", "v")
-        MODS(SDLK_b, "b", "B", "B", "b")
-        MODS(SDLK_n, "n", "N", "N", "n")
-        MODS(SDLK_m, "m", "M", "M", "m")
-        MODS(SDLK_COMMA, ",", "<", ",", "<")
-        MODS(SDLK_PERIOD, ".", ">", ".", ">")
-        MODS(SDLK_SLASH, "/", "?", "/", "?")
+        MOD_SHIFT(SDLK_z, "z", "Z", "Z", "z")
+        MOD_SHIFT(SDLK_x, "x", "X", "X", "x")
+        MOD_SHIFT(SDLK_c, "c", "C", "C", "c")
+        MOD_SHIFT(SDLK_v, "v", "V", "V", "v")
+        MOD_SHIFT(SDLK_b, "b", "B", "B", "b")
+        MOD_SHIFT(SDLK_n, "n", "N", "N", "n")
+        MOD_SHIFT(SDLK_m, "m", "M", "M", "m")
+        MOD_SHIFT(SDLK_COMMA, ",", "<", ",", "<")
+        MOD_SHIFT(SDLK_PERIOD, ".", ">", ".", ">")
+        MOD_SHIFT(SDLK_SLASH, "/", "?", "/", "?")
 
-        case SDLK_UP: write(pty_master, "\x1b[A", 3); break;
-        case SDLK_LEFT: write(pty_master, "\x1b[D", 3); break;
-        case SDLK_DOWN: write(pty_master, "\x1b[B", 3); break;
-        case SDLK_RIGHT: write(pty_master, "\x1b[C", 3); break;
-        case SDLK_HOME: write(pty_master, "\x1b[1~", 4); break;
-        case SDLK_END: write(pty_master, "\x1b[4~", 4); break;
-        case SDLK_PAGEUP: write(pty_master, "\x1b[5~", 4); break;
-        case SDLK_PAGEDOWN: write(pty_master, "\x1b[6~", 4); break;
-        case SDLK_INSERT: write(pty_master, "\x1b[2~", 4); break;
-        case SDLK_DELETE: write(pty_master, "\x1b[3~", 4); break;
-        case SDLK_SPACE: write(pty_master, " ", 1); break;
+        NO_MODS(SDLK_KP_DIVIDE, "/")
+        NO_MODS(SDLK_KP_MULTIPLY, "*")
+        NO_MODS(SDLK_KP_MINUS, "-")
+        NO_MODS(SDLK_KP_PLUS, "+")
+        NO_MODS(SDLK_SPACE, " ")
+        NO_MODS(SDLK_ESCAPE, "\x1b")
+
+#define UP_ESC "\x1bOA"
+#define DOWN_ESC "\x1bOB"
+#define RIGHT_ESC "\x1bOC"
+#define LEFT_ESC "\x1bOD"
+#define INSERT_ESC "\x1b[2~"
+#define DELETE_ESC "\x1b[3~"
+#define HOME_ESC "\x1b[H"
+#define END_ESC "\x1b[F"
+#define PAGEUP_ESC "\x1b[5~"
+#define PAGEDOWN_ESC "\x1b[6~"
+
+        NO_MODS(SDLK_UP, UP_ESC)
+        NO_MODS(SDLK_DOWN, DOWN_ESC)
+        NO_MODS(SDLK_RIGHT, RIGHT_ESC)
+        NO_MODS(SDLK_LEFT, LEFT_ESC)
+        NO_MODS(SDLK_INSERT, INSERT_ESC)
+        NO_MODS(SDLK_DELETE, DELETE_ESC)
+        NO_MODS(SDLK_HOME, HOME_ESC)
+        NO_MODS(SDLK_END, END_ESC)
+        NO_MODS(SDLK_PAGEUP, PAGEUP_ESC)
+        NO_MODS(SDLK_PAGEDOWN, PAGEDOWN_ESC)
+
+        NO_MODS(SDLK_KP_8, UP_ESC)
+        NO_MODS(SDLK_KP_2, DOWN_ESC)
+        NO_MODS(SDLK_KP_6, RIGHT_ESC)
+        NO_MODS(SDLK_KP_4, LEFT_ESC)
+        NO_MODS(SDLK_KP_0, INSERT_ESC)
+        NO_MODS(SDLK_KP_PERIOD, DELETE_ESC)
+        NO_MODS(SDLK_KP_7, HOME_ESC)
+        NO_MODS(SDLK_KP_1, END_ESC)
+        NO_MODS(SDLK_KP_9, PAGEUP_ESC)
+        NO_MODS(SDLK_KP_3, PAGEDOWN_ESC)
+
+        NO_MODS(SDLK_F1, "\x1bOP")
+        NO_MODS(SDLK_F2, "\x1bOQ")
+        NO_MODS(SDLK_F3, "\x1bOR")
+        NO_MODS(SDLK_F4, "\x1bOS")
+        NO_MODS(SDLK_F5, "\x1b[15~")
+        NO_MODS(SDLK_F6, "\x1b[17~")
+        NO_MODS(SDLK_F7, "\x1b[18~")
+        NO_MODS(SDLK_F8, "\x1b[19~")
+        NO_MODS(SDLK_F9, "\x1b[20~")
+        NO_MODS(SDLK_F10, "\x1b[21~")
+        NO_MODS(SDLK_F11, "\x1b[23~")
+        NO_MODS(SDLK_F12, "\x1b[24~")
     }
 }
 
