@@ -17,8 +17,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <config.h>
-
-#include "terminal/backends/framebuffer.h"
+#include <terminal/backends/framebuffer.h>
 
 #define LOGO_PATH "/assets/logo.bmp"
 #define INSTALLED_LOGO_PATH PACKAGE_DATADIR LOGO_PATH
