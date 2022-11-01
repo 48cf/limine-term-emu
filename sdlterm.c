@@ -16,8 +16,13 @@
 #include <termios.h>
 #include <unistd.h>
 #include <errno.h>
+#include <config.h>
 
 #include "terminal/backends/framebuffer.h"
+
+#define LOGO_PATH "/assets/logo.bmp"
+#define INSTALLED_LOGO_PATH PACKAGE_DATADIR LOGO_PATH
+#define LOCAL_LOGO_PATH SOURCE_ROOT LOGO_PATH
 
 #define FONT_WIDTH 8
 #define FONT_HEIGHT 16
@@ -186,7 +191,7 @@ static void *read_from_pty(void *arg) {
             }
 
             // abort           
-            printf("read_from_pty: read() failed (errno=%d)", errno);
+            printf("read_from_pty: read() failed (errno=%d)\n", errno);
             break;
         }
 
@@ -257,6 +262,26 @@ int main(int argc, char **argv) {
         printf("SDL could not create window: %s\n", SDL_GetError());
         return 1;
     }
+
+    char *icon_path;
+
+    if (access(INSTALLED_LOGO_PATH, F_OK) == 0) {
+        icon_path = INSTALLED_LOGO_PATH;
+    } else if (access(LOCAL_LOGO_PATH, F_OK) == 0) {
+        icon_path = LOCAL_LOGO_PATH;
+    } else {
+        printf("sdl: window icon not found\n");
+        return -1;
+    }
+
+    SDL_Surface *icon = SDL_LoadBMP(icon_path);
+
+    if (!icon) {
+        printf("sdl: failed to load window icon\n");
+        return -1;
+    }
+
+    SDL_SetWindowIcon(window, icon);
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -332,6 +357,7 @@ int main(int argc, char **argv) {
     kill(pid, SIGTERM);
     kill(pid, SIGKILL);
 
+    SDL_FreeSurface(icon);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
