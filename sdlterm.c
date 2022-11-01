@@ -33,9 +33,16 @@
 #define WINDOW_WIDTH (DEFAULT_COLS * (FONT_WIDTH + 1))
 #define WINDOW_HEIGHT (DEFAULT_ROWS * FONT_HEIGHT)
 
+#define MIN(A, B) ({ \
+    __auto_type MIN_a = A; \
+    __auto_type MIN_b = B; \
+    MIN_a < MIN_b ? MIN_a : MIN_b; \
+})
+
 static bool is_running = true;
 static struct term_context *ctx;
 static int pty_master;
+static Uint64 bell_start = 0;
 
 static void free_with_size(void *ptr, size_t size) {
     (void)size;
@@ -64,7 +71,10 @@ static void terminal_callback(struct term_context *ctx, uint64_t type, uint64_t 
                 }
                 printf("}, final='%c')\n", (int)arg3);
                 break;
-        case TERM_CB_BELL: printf("TERM_CB_BELL()\n"); break;
+        case TERM_CB_BELL:
+            printf("TERM_CB_BELL()\n");
+            bell_start = SDL_GetTicks64();
+            break;
         case TERM_CB_PRIVATE_ID: printf("TERM_CB_PRIVATE_ID()\n"); break;
         case TERM_CB_STATUS_REPORT: printf("TERM_CB_STATUS_REPORT()\n"); break;
         case TERM_CB_POS_REPORT: printf("TERM_CB_POS_REPORT(x=%lu, y=%lu)\n", arg1, arg2); break;
@@ -190,7 +200,7 @@ static void *read_from_pty(void *arg) {
                 continue;
             }
 
-            // abort           
+            // abort
             printf("read_from_pty: read() failed (errno=%d)\n", errno);
             break;
         }
@@ -290,6 +300,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
     void *framebuffer = malloc(WINDOW_WIDTH * WINDOW_HEIGHT * 4);
 
     if (!framebuffer) {
@@ -349,6 +361,17 @@ int main(int argc, char **argv) {
         SDL_UpdateTexture(framebuffer_texture, NULL, framebuffer, WINDOW_WIDTH * 4);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, framebuffer_texture, NULL, NULL);
+
+        Uint64 bell_length = 180;
+        if (bell_start > 0 && SDL_GetTicks64() < bell_start + bell_length) {
+            Uint64 elapsed = MIN(bell_length, SDL_GetTicks64() - bell_start);
+            Uint64 remaining = bell_length - elapsed;
+            Uint64 alpha = ((remaining * 1000) / bell_length) / 10;
+
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, alpha);
+            SDL_RenderFillRect(renderer, NULL);
+        }
+
         SDL_RenderPresent(renderer);
     }
 
